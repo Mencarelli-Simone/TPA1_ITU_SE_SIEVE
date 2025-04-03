@@ -4,4 +4,5 @@
 ./.idea/
 /databases/
 /databases/*
+/databases
 *.csv
