@@ -9,3 +9,6 @@
 /databases/*
 /databases
 *.csv
+/countriestables/
+/countriestables/*
+/countriestables
