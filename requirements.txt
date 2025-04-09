@@ -7,3 +7,5 @@ jupyter
 pandarallel
 pandoc
 nbconvert[qtpdf]
+fuzzywuzzy
+python-Levenshtein
