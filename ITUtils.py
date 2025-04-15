@@ -4,6 +4,7 @@ import os
 from tqdm import tqdm
 from pandarallel import pandarallel
 
+
 def itu_to_bandwidth(itu_designation):
     """
     Convert ITU designation of emission to bandwidth in Hz.
@@ -82,7 +83,7 @@ def conflicts_appender(targetdf: pd.DataFrame, referencedf: pd.DataFrame) -> pd.
     subset_with_nan = ddf[ddf[[' channel.freq_max', ' channel.freq_min']].isna().any(axis=1)]
 
     # Remove rows with NaN values in 'channel.freq_max' or 'channel.freq_min'
-    ddf = ddf.dropna(subset=[ ' channel.freq_max', ' channel.freq_min'])
+    ddf = ddf.dropna(subset=[' channel.freq_max', ' channel.freq_min'])
 
     # Define a function to check for overlaps and update the tpaconflicts and percentoverlap columns
     def check_overlap(ddf_row, tpa):
@@ -95,7 +96,7 @@ def conflicts_appender(targetdf: pd.DataFrame, referencedf: pd.DataFrame) -> pd.
             ddf_fmin = ddf_row[' channel.freq_min']
 
             # Check if intervals overlap
-            if not (tpa_fmax < ddf_fmin or tpa_fmin > ddf_fmax):
+            if not (tpa_fmax <= ddf_fmin or tpa_fmin >= ddf_fmax):
                 conflicts += f"{tpa_index}:"
                 overlap_start = max(tpa_fmin, ddf_fmin)
                 overlap_end = min(tpa_fmax, ddf_fmax)
@@ -117,21 +118,145 @@ def conflicts_appender(targetdf: pd.DataFrame, referencedf: pd.DataFrame) -> pd.
 
     return ddf_conflicts, subset_with_nan
 
+
 def conflict_expander(ddf_conflicts: pd.DataFrame, referencedf: pd.DataFrame) -> pd.DataFrame:
     """
     explicits the type of conflict and appends a string containing percent,case under a colum corresponding to the
     conflicted tpa channel
-    :param ddf_conflicts:
-    :param referencedf:
+    :param ddf_conflicts: table to expand
+    :param referencedf: referende dataframe
     :return:
     """
+    # Initialize pandarallel
+    num_logical_processors = os.cpu_count()
+    pandarallel.initialize(nb_workers=num_logical_processors, progress_bar=True)
     # step 1, for every TPA emission add a column with title TPA1.fmin-fmax_E or TPA1.fmin-fmax_R
     emissionnames = []
 
     for tpa_index, tpa_row in referencedf.iterrows():
-        tpa_fmax = tpa_row['channel.freq_max']
-        tpa_fmin = tpa_row['channel.freq_min']
+        tpa_fmax = tpa_row[' channel.freq_max']
+        tpa_fmin = tpa_row[' channel.freq_min']
         emistype = tpa_row[' s_beam.emi_rcp']
-        name = str('TPA1.'+tpa_fmin+'-'+tpa_fmax+'_'+emistype)
+        name = str('TPA1.' + str(tpa_fmin) + '-' + str(tpa_fmax) + '_' + emistype)
         emissionnames.append(name)
     print(emissionnames)
+    # emissionnames is a lookup for the index
+    # the goal now is to append all the emissionnames as columns and fill each column with the corresponding percentual
+    # and conflict type e.g ER97
+    # CONFLICT TYPES first letter TPA emission type (last letter of the column title)
+    #                second letter Other emission type (current row ' s_beam.emi_rcp')
+    # (A) ER = TPA emitting Other receiving
+    # (B) EE = TPA emitting Other emitting (Other BS receiving)
+    # (C) RR = TPA receiving Other receiving
+    # (D) RE = TPA receiving Other emitting (this is not a problem for others)
+    # append columns to ddf_conflicts
+    for name in emissionnames:
+        ddf_conflicts[name] = None
+
+    def conflict_distributor(df_row):
+        conflicts_string = df_row['tpaconflicts']
+        percent_string = df_row['percentoverlap']
+        conflicts_str = conflicts_string.split(":")# this is effectively an index
+        conflicts = []
+        for c in conflicts_str:
+            if c != '':
+                conflicts.append(int(c))
+        # print(conflicts)
+        percent = percent_string.split(":")
+        conflicts = conflicts[0:len(percent)] # ensure there is no empty conflict at the end
+        # find the conflict type for every conflict
+        types = []
+        for conf, perc in zip(conflicts, percent):
+            tpa_emistype = emissionnames[conf][-1]
+            other_emistype = df_row[' s_beam.emi_rcp'].strip()
+            if tpa_emistype == 'E' and other_emistype == 'R':
+                conflict_type = 'ER'
+            elif tpa_emistype == 'E' and other_emistype == 'E':
+                conflict_type = 'EE'
+            elif tpa_emistype == 'R' and other_emistype == 'R':
+                conflict_type = 'RR'
+            elif tpa_emistype == 'R' and other_emistype == 'E':
+                conflict_type = 'RE'
+            else:
+                conflict_type = 'NA'
+            types.append(f"{conflict_type}{perc}")
+        # fill the columns
+        for conf, type in zip(conflicts, types):
+            df_row[emissionnames[conf]] = type
+        return df_row
+    # apply to whole table using pandarallel as other function
+    ddf_conflicts = ddf_conflicts.parallel_apply(conflict_distributor, axis=1)
+    # ddf_conflicts = ddf_conflicts.apply(conflict_distributor, axis=1) # for debugging
+    return ddf_conflicts
+
+def conflict_tables_separator(expanded: pd.DataFrame, referencedf: pd.DataFrame, outfolder) -> pd.DataFrame:
+    """
+    explicits the type of conflict and appends a string containing percent,case under a colum corresponding to the
+    conflicted tpa channel
+    :param expanded: table to expand
+    :param referencedf: referende dataframe
+    :param outfolder: folder path for output tables
+    :return:
+    """
+    # Initialize pandarallel
+    num_logical_processors = os.cpu_count()
+    pandarallel.initialize(nb_workers=num_logical_processors, progress_bar=True)
+    # step 1, for every TPA emission add a column with title TPA1.fmin-fmax_E or TPA1.fmin-fmax_R
+    emissionnames = []
+    for tpa_index, tpa_row in referencedf.iterrows():
+        tpa_fmax = tpa_row[' channel.freq_max']
+        tpa_fmin = tpa_row[' channel.freq_min']
+        emistype = tpa_row[' s_beam.emi_rcp']
+        name = str('TPA1.' + str(tpa_fmin) + '-' + str(tpa_fmax) + '_' + emistype)
+        emissionnames.append(name)
+    print(emissionnames)
+
+    for name in emissionnames:
+        # Only keep rows where the column 'name' is not None
+        subset_df = expanded[expanded[name].notna()]
+
+        # Separate entries with 'E' and entries with 'R'
+        subset_E = subset_df[subset_df[' s_beam.emi_rcp'].str.contains('E', na=False)]
+        subset_R = subset_df[subset_df[' s_beam.emi_rcp'].str.contains('R', na=False)]
+
+        # Separate entries where 's_beam.emi_rcp' is NaN
+        subset_N = subset_df[~subset_df.index.isin(subset_E.index) & ~subset_df.index.isin(subset_R.index)]
+
+        # Sort each subset by the 'name' column in descending order
+        subset_E = subset_E.sort_values(by=name, ascending=False)
+        subset_R = subset_R.sort_values(by=name, ascending=False)
+        subset_N = subset_N.sort_values(by=name, ascending=False)
+
+
+        # Save the subsets to the specified folder if they are not empty
+        if not subset_E.empty:
+            subset_E.to_csv(os.path.join(outfolder, f"{name}_E.csv"), index=False)
+            print('table saved to', os.path.join(outfolder, f"{name}_E.csv"))
+        if not subset_R.empty:
+            subset_R.to_csv(os.path.join(outfolder, f"{name}_R.csv"), index=False)
+            print('table saved to', os.path.join(outfolder, f"{name}_R.csv"))
+        if not subset_N.empty:
+            subset_N.to_csv(os.path.join(outfolder, f"{name}_N.csv"), index=False)
+            print('table saved to', os.path.join(outfolder, f"{name}_N.csv"))
+
+        # Create subsets with only one entry per unique 'com_el.sat_name'
+        unique_subset_E = subset_E.drop_duplicates(subset=' com_el.sat_name', keep='first')
+        unique_subset_R = subset_R.drop_duplicates(subset=' com_el.sat_name', keep='first')
+        unique_subset_N = subset_N.drop_duplicates(subset=' com_el.sat_name', keep='first')
+
+        # Save the unique subsets to the specified folder if they are not empty
+        if not unique_subset_E.empty:
+            unique_subset_E.to_csv(os.path.join(outfolder, f"{name}_E_worstcase.csv"), index=False)
+            print('table saved to', os.path.join(outfolder, f"{name}_E_worstcase.csv"))
+        if not unique_subset_R.empty:
+            unique_subset_R.to_csv(os.path.join(outfolder, f"{name}_R_worstcase.csv"), index=False)
+            print('table saved to', os.path.join(outfolder, f"{name}_R_worstcase.csv"))
+        if not unique_subset_N.empty:
+            unique_subset_N.to_csv(os.path.join(outfolder, f"{name}_N_worstcase.csv"), index=False)
+            print('table saved to', os.path.join(outfolder, f"{name}_N_worstcase.csv"))
+
+
+
+
+
+
