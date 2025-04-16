@@ -209,7 +209,7 @@ def sat_names_isolator(df: pd.DataFrame, namesfolder: str) -> pd.DataFrame:
             # Open and read the file
             with open(file_path, 'r') as file:
                 # Read the content and split by commas
-                content = file.read().strip().split(',')
+                content = file.read().strip().split(', ')
                 # Extend the big list with the content
                 big_list.extend(content)
 
@@ -219,7 +219,7 @@ def sat_names_isolator(df: pd.DataFrame, namesfolder: str) -> pd.DataFrame:
     # Create the discarded dataframe with the remaining lines
     discarded_df = df[~df[' com_el.sat_name'].isin(big_list)]
 
-    return matched_df, discarded_df
+    return matched_df, discarded_df, big_list
 
 def conflict_tables_separator(expanded: pd.DataFrame, referencedf: pd.DataFrame, outfolder) -> pd.DataFrame:
     """

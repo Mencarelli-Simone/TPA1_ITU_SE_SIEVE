@@ -120,9 +120,13 @@ and other 24 files for the simplified case with only the worst case overlap per 
 - **Table of Name Matches**: 'satellite_matches.csv': Contains a 4 columns table, administration code, satellite name
   from the Tracking spreadsheet lists, best match found in the ITU tables, match score (0-100, with 100 exact match)
 
+IN FOLDER ./databses/
 - **Expanded Conflict Table**: 'expanded_combined_tables_conflicts.csv': Contains the original conflict data with
   additional columns for each conflict type and channel.
+- **Rejected entries Table**: 'expanded_combined_tables_conflicts_rejected.csv' : Contains all the conflicts that do not
+belong to any of the listed satellite names.
 
+IN FOLDER ./output_tables/ 
 - **Separated Conflict Tables**: Files like TPA1.2055.475-2055.725_R_E.csv: Each file contains data for a specific
   conflict type and frequency range.
 
