@@ -189,6 +189,38 @@ def conflict_expander(ddf_conflicts: pd.DataFrame, referencedf: pd.DataFrame) ->
     # ddf_conflicts = ddf_conflicts.apply(conflict_distributor, axis=1) # for debugging
     return ddf_conflicts
 
+def sat_names_isolator(df: pd.DataFrame, namesfolder: str) -> pd.DataFrame:
+    """
+    separates the entries with satellite names contained in the names folder
+    outputs two dataframes, one with all the listed satellite names and the other with the remaining entries
+    : param df: dataframe containing satellite names
+    : param namesfolder: folder containing satellite names
+    : return: matched_df, discarded_df
+    """
+    # Initialize an empty list to store the data
+    big_list = []
+
+    # Iterate over each file in the folder
+    for filename in os.listdir(namesfolder):
+        if filename.endswith('.txt'):
+            # Construct the full file path
+            file_path = os.path.join(namesfolder, filename)
+
+            # Open and read the file
+            with open(file_path, 'r') as file:
+                # Read the content and split by commas
+                content = file.read().strip().split(',')
+                # Extend the big list with the content
+                big_list.extend(content)
+
+    # Isolate the lines where the name corresponds to one of the big list entries
+    matched_df = df[df[' com_el.sat_name'].isin(big_list)]
+
+    # Create the discarded dataframe with the remaining lines
+    discarded_df = df[~df[' com_el.sat_name'].isin(big_list)]
+
+    return matched_df, discarded_df
+
 def conflict_tables_separator(expanded: pd.DataFrame, referencedf: pd.DataFrame, outfolder) -> pd.DataFrame:
     """
     explicits the type of conflict and appends a string containing percent,case under a colum corresponding to the
