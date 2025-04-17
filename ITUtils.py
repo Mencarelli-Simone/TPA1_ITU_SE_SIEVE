@@ -3,6 +3,7 @@ import numpy as np
 import os
 from tqdm import tqdm
 from pandarallel import pandarallel
+from time import sleep
 
 
 def itu_to_bandwidth(itu_designation):
@@ -71,7 +72,7 @@ def conflicts_appender(targetdf: pd.DataFrame, referencedf: pd.DataFrame) -> pd.
     num_logical_processors = os.cpu_count()
     pandarallel.initialize(nb_workers=num_logical_processors, progress_bar=True)
 
-    ddf = channel_appender(targetdf)
+    ddf = channel_appender(targetdf)  # ok
 
     # Ensure the tpaconflicts and percentoverlap columns exist in ddf
     if 'tpaconflicts' not in ddf.columns:
@@ -101,14 +102,19 @@ def conflicts_appender(targetdf: pd.DataFrame, referencedf: pd.DataFrame) -> pd.
                 overlap_start = max(tpa_fmin, ddf_fmin)
                 overlap_end = min(tpa_fmax, ddf_fmax)
                 overlap_length = overlap_end - overlap_start
+                ddf_length = ddf_fmax - ddf_fmin
                 tpa_length = tpa_fmax - tpa_fmin
-                percent_overlap = (overlap_length / tpa_length) * 100
+                percent_overlap = (overlap_length / ddf_length) * 100
                 percent_overlap_list.append(f"{percent_overlap:.0f}")
 
         percent_overlap_str = ":".join(percent_overlap_list)
         return conflicts, percent_overlap_str
 
     # Apply the function to each row of the ddf DataFrame in parallel
+    # ddf[['tpaconflicts', 'percentoverlap']] = ddf.parallel_apply(
+    #     lambda row: check_overlap(row, referencedf), axis=1, result_type='expand'
+    # )
+
     ddf[['tpaconflicts', 'percentoverlap']] = ddf.parallel_apply(
         lambda row: check_overlap(row, referencedf), axis=1, result_type='expand'
     )
@@ -119,7 +125,7 @@ def conflicts_appender(targetdf: pd.DataFrame, referencedf: pd.DataFrame) -> pd.
     return ddf_conflicts, subset_with_nan
 
 
-def conflict_expander(ddf_conflicts: pd.DataFrame, referencedf: pd.DataFrame) -> pd.DataFrame:
+def conflict_expander(ddf_conflicts: pd.DataFrame, referencedf: pd.DataFrame, eminames=False) -> pd.DataFrame:
     """
     explicits the type of conflict and appends a string containing percent,case under a colum corresponding to the
     conflicted tpa channel
@@ -127,9 +133,9 @@ def conflict_expander(ddf_conflicts: pd.DataFrame, referencedf: pd.DataFrame) ->
     :param referencedf: referende dataframe
     :return:
     """
-    # Initialize pandarallel
-    num_logical_processors = os.cpu_count()
-    pandarallel.initialize(nb_workers=num_logical_processors, progress_bar=True)
+    # # Initialize pandarallel
+    # num_logical_processors = os.cpu_count()
+    # pandarallel.initialize(nb_workers=num_logical_processors, progress_bar=True)
     # step 1, for every TPA emission add a column with title TPA1.fmin-fmax_E or TPA1.fmin-fmax_R
     emissionnames = []
 
@@ -154,16 +160,16 @@ def conflict_expander(ddf_conflicts: pd.DataFrame, referencedf: pd.DataFrame) ->
         ddf_conflicts[name] = None
 
     def conflict_distributor(df_row):
-        conflicts_string = df_row['tpaconflicts']
-        percent_string = df_row['percentoverlap']
-        conflicts_str = conflicts_string.split(":")# this is effectively an index
+        conflicts_string = str(df_row['tpaconflicts'])
+        percent_string = str(df_row['percentoverlap'])
+        conflicts_str = conflicts_string.split(":")  # this is effectively an index
         conflicts = []
         for c in conflicts_str:
-            if c != '':
+            if c not in [None, '', 'nan'] and not pd.isna(c) and not pd.isna(int(c)):
                 conflicts.append(int(c))
         # print(conflicts)
         percent = percent_string.split(":")
-        conflicts = conflicts[0:len(percent)] # ensure there is no empty conflict at the end
+        conflicts = conflicts[0:len(percent)]  # ensure there is no empty conflict at the end
         # find the conflict type for every conflict
         types = []
         for conf, perc in zip(conflicts, percent):
@@ -179,15 +185,22 @@ def conflict_expander(ddf_conflicts: pd.DataFrame, referencedf: pd.DataFrame) ->
                 conflict_type = 'RE'
             else:
                 conflict_type = 'NA'
-            types.append(f"{conflict_type}{perc}")
+            types.append(f"{int(perc):>3}%{conflict_type}")
         # fill the columns
         for conf, type in zip(conflicts, types):
             df_row[emissionnames[conf]] = type
         return df_row
+
     # apply to whole table using pandarallel as other function
-    ddf_conflicts = ddf_conflicts.parallel_apply(conflict_distributor, axis=1)
-    # ddf_conflicts = ddf_conflicts.apply(conflict_distributor, axis=1) # for debugging
-    return ddf_conflicts
+    if len(ddf_conflicts) > 24:
+        ddf_conflicts = ddf_conflicts.parallel_apply(conflict_distributor, axis=1)
+    else:
+        ddf_conflicts = ddf_conflicts.apply(conflict_distributor, axis=1)  # for debugging
+    if eminames:
+        return ddf_conflicts, emissionnames
+    else:
+        return ddf_conflicts
+
 
 def sat_names_isolator(df: pd.DataFrame, namesfolder: str) -> pd.DataFrame:
     """
@@ -220,6 +233,7 @@ def sat_names_isolator(df: pd.DataFrame, namesfolder: str) -> pd.DataFrame:
     discarded_df = df[~df[' com_el.sat_name'].isin(big_list)]
 
     return matched_df, discarded_df, big_list
+
 
 def conflict_tables_separator(expanded: pd.DataFrame, referencedf: pd.DataFrame, outfolder) -> pd.DataFrame:
     """
@@ -259,7 +273,6 @@ def conflict_tables_separator(expanded: pd.DataFrame, referencedf: pd.DataFrame,
         subset_R = subset_R.sort_values(by=name, ascending=False)
         subset_N = subset_N.sort_values(by=name, ascending=False)
 
-
         # Save the subsets to the specified folder if they are not empty
         if not subset_E.empty:
             subset_E.to_csv(os.path.join(outfolder, f"{name}_E.csv"), index=False)
@@ -288,7 +301,90 @@ def conflict_tables_separator(expanded: pd.DataFrame, referencedf: pd.DataFrame,
             print('table saved to', os.path.join(outfolder, f"{name}_N_worstcase.csv"))
 
 
+def country_conflicts_finder(countrycode: str, referencedf: pd.DataFrame, tablesfolder: str, namesfolder: str,
+                             outfolder: str, disp=True) -> pd.DataFrame:
+    """
+    :param countrycode: adm country code
+    :param referencedf: tpa mission df
+    :param tablesfolder: folder with adm tables
+    :param namesfolder: folder with adm satellite names lists
+    :return expanded_table, expanded_rejected, expanded_simplified, noinfofoundmissions
+    """
 
+    # Initialize pandarallel
+    num_logical_processors = os.cpu_count()
+    pandarallel.initialize(nb_workers=num_logical_processors, progress_bar=True)
 
+    # load in a single dataframe all tables corresponding to the country code
+    all_tables = []
+    for filename in os.listdir(tablesfolder):
+        if str(countrycode) in filename[:len(countrycode)]:
+            print('loading ', filename)
+            filepath = os.path.join(tablesfolder, filename)
+            df = pd.read_csv(filepath, low_memory=False)
+            all_tables.append(df)
+    combined_df = pd.concat(all_tables, ignore_index=True)
+    # drop all entries with different countrycode
+    combined_df = combined_df[combined_df[' com_el.adm'] == countrycode]
 
+    # now apply the conflict detection to the combined_df
+    print('finding conflicts for ', countrycode)
+    conflicts, noinfo = conflicts_appender(combined_df, referencedf)
+    # save conflicts
+    os.makedirs(os.path.join(outfolder, 'output_tables'), exist_ok=True)
 
+    conflicts.to_csv(os.path.join(outfolder, 'conflicts.csv'), index=False)
+    print('file saved to ', os.path.join(outfolder, 'conflicts.csv'))
+    # get the reference names
+    namelist = []
+    # Iterate over each file in the folder
+    for filename in os.listdir(namesfolder):
+        if filename.endswith('.txt') and countrycode in filename:
+            # Construct the full file path
+            file_path = os.path.join(namesfolder, filename)
+
+            # Open and read the file
+            with open(file_path, 'r') as file:
+                # Read the content and split by commas
+                content = file.read().strip().split(', ')
+                # Extend the big list with the content
+                namelist.extend(content)
+    if disp:
+        print('satellite names for', countrycode, ' : \n', namelist)
+    # in noinfo there is a list of conflicts that did not list a carrier frequency. these need to have the mission names
+    # extracted and compared with the ones listed and output as noinfofoundmissionlist
+    # 1 find all the names in noinfo
+    noinfonames1 = noinfo[' com_el.sat_name'].unique()
+    if disp:
+        display(noinfo)
+    noinfonames = []
+    for n in noinfonames1:
+        if n in namelist:
+            noinfonames.append(n)
+    if disp:
+        print('names with no frequency info', noinfonames)  # todo return this
+
+    ## extend the conflicts
+    print('expanding the conflict columns for', countrycode)
+    sleep(5)
+    expanded, conflictcolumns = conflict_expander(conflicts, referencedf, eminames=True)
+
+    ## filter by names
+    # Isolate the lines where the name corresponds to one of the big list entries
+    matched_df = expanded[expanded[' com_el.sat_name'].isin(namelist)]
+
+    # Create the discarded dataframe with the remaining lines
+    discarded_df = expanded[~expanded[' com_el.sat_name'].isin(namelist)]
+
+    ## separate the conflicts in types
+    # create directory if not exist
+    os.makedirs(os.path.join(outfolder, 'output_tables'), exist_ok=True)
+    conflict_tables_separator(matched_df, referencedf, os.path.join(outfolder, 'output_tables'))
+
+    # save expanded to file
+    matched_df.to_csv(os.path.join(outfolder, 'expanded_combined_tables_conflicts_lettersatnames.csv'), index=False)
+    print('file saved to ', os.path.join(outfolder, 'expanded_combined_tables_conflicts_lettersatnames.csv'))
+    discarded_df.to_csv(os.path.join(outfolder, 'expanded_combined_tables_conflicts_othersatnames.csv'), index=False)
+    print('file saved to', os.path.join(outfolder, 'expanded_combined_tables_conflicts_othersatnames.csv'))
+
+    return noinfonames
