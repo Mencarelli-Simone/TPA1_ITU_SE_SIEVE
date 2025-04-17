@@ -18,6 +18,7 @@ For each administration (e.g., `AUS`, `CAN`, `CHN`, etc.), the following files a
 
 - **conflict_percent_pivot_table.csv**  
   Pivot table summarizing percentage overlaps by satellite name and TPA channel.
+  NOTE: the percent is defined as band_overlap / foreign_sat_bandwidth x 100 
 
 - **conflict_summary_by_freq_type.csv**  
   Summary table aggregating conflicts by frequency range and conflict type (e.g., E_R, R_E, etc.).
