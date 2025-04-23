@@ -120,9 +120,9 @@ def conflicts_appender(targetdf: pd.DataFrame, referencedf: pd.DataFrame) -> pd.
     )
 
     # Filter out non-conflicting rows
-    ddf_conflicts = ddf[ddf['tpaconflicts'] != '']
+    #ddf_conflicts = ddf[ddf['tpaconflicts'] != '']
 
-    return ddf_conflicts, subset_with_nan
+    return ddf, subset_with_nan
 
 
 def conflict_expander(ddf_conflicts: pd.DataFrame, referencedf: pd.DataFrame, eminames=False) -> pd.DataFrame:
