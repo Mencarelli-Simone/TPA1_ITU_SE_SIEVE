@@ -21,7 +21,7 @@ For each administration (e.g., `AUS`, `CAN`, `CHN`, etc.), the following files a
   NOTE: the percent is defined as band_overlap / foreign_sat_bandwidth x 100 
 
 - **conflict_summary_by_freq_type.csv**  
-  Summary table aggregating conflicts by frequency range and conflict type (e.g., E_R, R_E, etc.).
+  Summary table aggregating conflicts by frequency range and conflict type (e.g., E_R, R_E, etc.). The frequency and bandwidth columns refer to the TPA1 mission filings
 
 - **conflict_type_barplot.png**  
   Bar plot showing the number of conflicts per conflict type.
@@ -29,5 +29,8 @@ For each administration (e.g., `AUS`, `CAN`, `CHN`, etc.), the following files a
 - **noinfooncarrierfrequency.txt**  
   List of entries where carrier frequency information was missing or incomplete.
 
-- **output_tables/**  
+- **output_tables**  
   Folder containing conflict tables split by TPA1 channel and conflict type, plus worst-case overlap summaries.
+
+- **conflicts_summary**
+  Contains a table with entries for all the satellite names (from the adm. letters). It contains the following 5 columns:  Sat Name (=com_el.sat_name), Beam Name (=s_beam.beam_name), Carrier Freq. (fc) (=carrier_fr.freq_carrier), Bandwidth ( from emiss.design_emi), Overlaps (list of overlapping TPA channels) 

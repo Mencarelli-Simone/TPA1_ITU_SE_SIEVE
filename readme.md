@@ -62,7 +62,8 @@ In the order they need to be run to reproduce the results
            entries with satellite name contained in the ./satellitenames folder
         2. **expanded_combined_tables_conflicts_rejected**: conflict table for all the satellite names not in the lists
         3. **output_tables folder**: containing the output tablse separated by conflict type and channel
-
+- **big_script.ipynb** create a folder for each administration
+- **summary table.ipynb** creates the conflicts_summary in each adm folder
 # Functions in ITUtils.py
 
 ITUtils.py contains a series of functions to perform the frequency overlap and percentage of overlap checks on the
