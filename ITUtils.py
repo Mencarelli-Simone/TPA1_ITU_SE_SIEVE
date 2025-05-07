@@ -97,7 +97,7 @@ def conflicts_appender(targetdf: pd.DataFrame, referencedf: pd.DataFrame) -> pd.
             ddf_fmin = ddf_row[' channel.freq_min']
 
             # Check if intervals overlap
-            if not (tpa_fmax <= ddf_fmin or tpa_fmin >= ddf_fmax):
+            if not (tpa_fmax < ddf_fmin or tpa_fmin > ddf_fmax):
                 conflicts += f"{tpa_index}:"
                 overlap_start = max(tpa_fmin, ddf_fmin)
                 overlap_end = min(tpa_fmax, ddf_fmax)

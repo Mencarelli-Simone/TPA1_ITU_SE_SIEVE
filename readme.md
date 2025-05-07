@@ -62,6 +62,9 @@ In the order they need to be run to reproduce the results
            entries with satellite name contained in the ./satellitenames folder
         2. **expanded_combined_tables_conflicts_rejected**: conflict table for all the satellite names not in the lists
         3. **output_tables folder**: containing the output tablse separated by conflict type and channel
+
+**To create the content of adm_conflicts**
+
 - **big_script.ipynb** create a folder for each administration
 - **summary table.ipynb** creates the conflicts_summary in each adm folder
 # Functions in ITUtils.py
@@ -122,17 +125,23 @@ and other 24 files for the simplified case with only the worst case overlap per 
   from the Tracking spreadsheet lists, best match found in the ITU tables, match score (0-100, with 100 exact match)
 
 IN FOLDER ./databses/
+
 - **Expanded Conflict Table**: 'expanded_combined_tables_conflicts.csv': Contains the original conflict data with
   additional columns for each conflict type and channel.
 - **Rejected entries Table**: 'expanded_combined_tables_conflicts_rejected.csv' : Contains all the conflicts that do not
 belong to any of the listed satellite names.
 
 IN FOLDER ./output_tables/ 
+
 - **Separated Conflict Tables**: Files like TPA1.2055.475-2055.725_R_E.csv: Each file contains data for a specific
   conflict type and frequency range.
 
 - **Worst-case Scenario Tables**:
   Files like TPA1.2055.475-2055.725_R_E_worstcase.csv: Each file contains the worst-case frequency overlap percentage
   for each mission within the specified conflict type and frequency range.
+
+IN FOLDER ./adm_conflicts/ 
+
+see the readme
 
 
