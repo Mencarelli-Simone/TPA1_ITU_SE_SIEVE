@@ -57,3 +57,5 @@ For each administration (e.g., `AUS`, `CAN`, `CHN`, etc.), the following files a
 - **summary_pivot_othersatnames.csv**  
   Pivot table summarising the maximum conflict percentage and count of channels for each conflict type. This table is
   based on the conflict data for satellites **not** present in the administration-provided name lists.
+- **conflicts_summary_condensed.csv**
+  File to sent to RSM 

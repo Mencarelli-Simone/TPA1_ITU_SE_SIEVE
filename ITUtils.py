@@ -105,7 +105,7 @@ def conflicts_appender(targetdf: pd.DataFrame, referencedf: pd.DataFrame) -> pd.
                 ddf_length = ddf_fmax - ddf_fmin
                 tpa_length = tpa_fmax - tpa_fmin
                 percent_overlap = (overlap_length / ddf_length) * 100
-                percent_overlap_list.append(f"{percent_overlap:.0f}")
+                percent_overlap_list.append(f"{percent_overlap:.1f}")
 
         percent_overlap_str = ":".join(percent_overlap_list)
         return conflicts, percent_overlap_str
@@ -347,8 +347,9 @@ def country_conflicts_finder(countrycode: str, referencedf: pd.DataFrame, tables
             with open(file_path, 'r') as file:
                 # Read the content and split by commas
                 content = file.read().strip().split(', ')
+                cleaned = [name.strip() for name in content]
                 # Extend the big list with the content
-                namelist.extend(content)
+                namelist.extend(cleaned)
     if disp:
         print('satellite names for', countrycode, ' : \n', namelist)
     # in noinfo there is a list of conflicts that did not list a carrier frequency. these need to have the mission names
