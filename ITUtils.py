@@ -185,7 +185,7 @@ def conflict_expander(ddf_conflicts: pd.DataFrame, referencedf: pd.DataFrame, em
                 conflict_type = 'RE'
             else:
                 conflict_type = 'NA'
-            types.append(f"{int(perc):>3}%{conflict_type}")
+            types.append(f"{round(float(perc),1):>5.1f}%{conflict_type}")
         # fill the columns
         for conf, type in zip(conflicts, types):
             df_row[emissionnames[conf]] = type
