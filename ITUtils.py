@@ -114,10 +114,17 @@ def conflicts_appender(targetdf: pd.DataFrame, referencedf: pd.DataFrame) -> pd.
     # ddf[['tpaconflicts', 'percentoverlap']] = ddf.parallel_apply(
     #     lambda row: check_overlap(row, referencedf), axis=1, result_type='expand'
     # )
+    if len(ddf) > 48:
+        ddf[['tpaconflicts', 'percentoverlap']] = ddf.parallel_apply(
+        lambda row: check_overlap(row, referencedf), axis=1, result_type='expand')
+    else:
+        if len(ddf):
+            ddf[['tpaconflicts', 'percentoverlap']] = ddf.apply(
+                lambda row: check_overlap(row, referencedf), axis=1, result_type='expand')
+        else:
+            ddf['tpaconflicts'] = pd.Series(dtype='string')
+            ddf['percentoverlap'] = pd.Series(dtype='string')
 
-    ddf[['tpaconflicts', 'percentoverlap']] = ddf.parallel_apply(
-        lambda row: check_overlap(row, referencedf), axis=1, result_type='expand'
-    )
 
     # Filter out non-conflicting rows
     #ddf_conflicts = ddf[ddf['tpaconflicts'] != '']
@@ -192,7 +199,7 @@ def conflict_expander(ddf_conflicts: pd.DataFrame, referencedf: pd.DataFrame, em
         return df_row
 
     # apply to whole table using pandarallel as other function
-    if len(ddf_conflicts) > 24:
+    if len(ddf_conflicts) > 48:
         ddf_conflicts = ddf_conflicts.parallel_apply(conflict_distributor, axis=1)
     else:
         ddf_conflicts = ddf_conflicts.apply(conflict_distributor, axis=1)  # for debugging
@@ -380,8 +387,8 @@ def country_conflicts_finder(countrycode: str, referencedf: pd.DataFrame, tables
     ## separate the conflicts in types
     # create directory if not exist
     os.makedirs(os.path.join(outfolder, 'output_tables'), exist_ok=True)
-    conflict_tables_separator(matched_df, referencedf, os.path.join(outfolder, 'output_tables'))
-
+    if len(matched_df):
+        conflict_tables_separator(matched_df, referencedf, os.path.join(outfolder, 'output_tables'))
     # save expanded to file
     matched_df.to_csv(os.path.join(outfolder, 'expanded_combined_tables_conflicts_lettersatnames.csv'), index=False)
     print('file saved to ', os.path.join(outfolder, 'expanded_combined_tables_conflicts_lettersatnames.csv'))
