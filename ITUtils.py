@@ -125,11 +125,19 @@ def conflicts_appender(targetdf: pd.DataFrame, referencedf: pd.DataFrame) -> pd.
             ddf['tpaconflicts'] = pd.Series(dtype='string')
             ddf['percentoverlap'] = pd.Series(dtype='string')
 
+    ## todo merge back ddf and subset_with_nan append subset to ddf and leave empty the tpaconflicts and percentoverlap cols
+
+    # Add empty conflict columns to subset_with_nan
+    subset_with_nan['tpaconflicts'] = ''
+    subset_with_nan['percentoverlap'] = ''
+
+    # Concatenate the processed ddf with the subset containing NaNs
+    final_df = pd.concat([ddf, subset_with_nan], ignore_index=True)
 
     # Filter out non-conflicting rows
     #ddf_conflicts = ddf[ddf['tpaconflicts'] != '']
 
-    return ddf, subset_with_nan
+    return final_df, subset_with_nan
 
 
 def conflict_expander(ddf_conflicts: pd.DataFrame, referencedf: pd.DataFrame, eminames=False) -> pd.DataFrame:
